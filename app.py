@@ -17,16 +17,16 @@ def get_data():
         # String concatenation: || is standard SQL (Postgres), + is T-SQL (SQL Server)
         query = """
         SELECT 
-            A.ApplicantID,
-            A.FirstName || ' ' || A.LastName AS Name,
-            A.Age,
-            A.EmploymentStatus,
-            FP.AnnualIncome,
-            FP.CreditScore,
-            LA.RequestAmount,
-            LA.Status,
-            P.RecommendedLoanAmount,
-            P.Reasoning
+            A.ApplicantID AS "ApplicantID",
+            A.FirstName || ' ' || A.LastName AS "Name",
+            A.Age AS "Age",
+            A.EmploymentStatus AS "EmploymentStatus",
+            FP.AnnualIncome AS "AnnualIncome",
+            FP.CreditScore AS "CreditScore",
+            LA.RequestAmount AS "RequestAmount",
+            LA.Status AS "Status",
+            P.RecommendedLoanAmount AS "RecommendedLoanAmount",
+            P.Reasoning AS "Reasoning"
         FROM LoanApplications LA
         JOIN Applicants A ON LA.ApplicantID = A.ApplicantID
         JOIN FinancialProfile FP ON A.ApplicantID = FP.ApplicantID
@@ -151,3 +151,4 @@ elif page == "Apply for Loan":
                         st.error(f"Database Error: {e}")
                 else:
                     st.error("Could not connect to database.")
+
