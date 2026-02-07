@@ -170,8 +170,15 @@ elif page == "Check Status":
                     P.PredictedEligibilityScore,
                     P.ModelRiskLevel,
                     P.Reasoning,
-                    P.RecommendedLoanAmount
+                    P.RecommendedLoanAmount,
+                    A.FirstName || ' ' || A.LastName AS Name,
+                    A.EmploymentStatus,
+                    FP.AnnualIncome,
+                    FP.CreditScore,
+                    FP.DebtToIncomeRatio
                 FROM LoanApplications LA
+                JOIN Applicants A ON LA.ApplicantID = A.ApplicantID
+                JOIN FinancialProfile FP ON A.ApplicantID = FP.ApplicantID
                 LEFT JOIN Predictions P ON LA.ApplicationID = P.ApplicationID
                 WHERE LA.ApplicationID = %s
                 """
@@ -180,33 +187,66 @@ elif page == "Check Status":
                 row = cursor.fetchone()
                 
                 if row:
-                    # Unpack (Postgres returns tuple)
+                    # Unpack
+                    # 0:AppID, 1:Status, 2:ReqAmount, 3:Score, 4:Risk, 5:Reasoning, 6:RecAmount
+                    # 7:Name, 8:EmpStatus, 9:Income, 10:CreditScore, 11:DTI
                     status = row[1]
                     req_amount = row[2]
                     score = row[3] if row[3] is not None else 0.0
-                    risk = row[4] if row[4] is not None else "Unknown"
+                    risk = row[4] if row[4] is not None else "Pending"
                     reasoning = row[5] if row[5] is not None else "Pending AI Analysis..."
                     rec_amount = row[6]
                     
-                    st.divider()
-                    st.subheader(f"Application #{row[0]}")
+                    name = row[7]
+                    emp_status = row[8]
+                    income = row[9]
+                    cibil = row[10]
+                    dti = row[11]
                     
+                    st.divider()
+                    st.subheader(f"Application #{row[0]} - {name}")
+                    
+                    # Status Badge
                     if status == "Approved":
-                        st.success(f"Status: {status}")
+                        st.success(f"**Decision: {status}**")
                     elif status == "Rejected":
-                        st.error(f"Status: {status}")
+                        st.error(f"**Decision: {status}**")
                     else:
-                        st.warning(f"Status: {status}")
+                        st.warning(f"**Decision: {status}**")
                         
+                    # 1. Financial Snapshot (The "Why")
+                    st.markdown("#### 📊 Financial Profile Used for Decision")
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Credit Score (CIBIL)", cibil, delta_color="normal" if cibil > 700 else "inverse")
+                    m2.metric("Annual Income", f"₹{income:,.0f}")
+                    m3.metric("Debt-to-Income", f"{dti*100:.1f}%", delta_color="inverse" if dti < 0.4 else "normal") # Low DTI is good
+                    m4.metric("Emp. Status", emp_status)
+                    
+                    st.divider()
+
+                    # 2. Loan Details
+                    st.markdown("#### 💰 Loan Offer Details")
                     col1, col2 = st.columns(2)
                     col1.metric("Requested Amount", f"₹{req_amount:,.2f}")
                     if rec_amount:
-                        col2.metric("Approved Amount", f"₹{rec_amount:,.2f}")
+                        col2.metric("✅ Approved Amount", f"₹{rec_amount:,.2f}", delta=f"{(rec_amount-req_amount):,.0f}" if rec_amount != req_amount else None)
+                    else:
+                        col2.metric("Approved Amount", "₹0.00")
                     
-                    st.markdown("### 🤖 AI Analysis")
-                    st.write(f"**Risk Level:** {risk}")
-                    st.write(f"**Eligibility Score:** {score:.2f}")
-                    st.info(f"**Reasoning:** {reasoning}")
+                    # 3. AI Reasoning
+                    st.markdown("#### 🤖 AI Underwriting Logic")
+                    st.write(f"**Risk Profile:** {risk}")
+                    st.write(f"**Eligibility Confidence:** {score*100:.1f}%")
+                    
+                    with st.expander("See Detailed Reasoning", expanded=True):
+                        st.info(f"**Agent Reasoning:** {reasoning}")
+                        if status == "Rejected":
+                            st.markdown("""
+                            *Common Rejection Reasons:*
+                            - Credit Score < 650
+                            - Debt-to-Income Ratio > 50%
+                            - Loan Amount too high for reported Income
+                            """)
                     
                 else:
                     st.error("Application ID not found.")
