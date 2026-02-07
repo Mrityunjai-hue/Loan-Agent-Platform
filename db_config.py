@@ -2,19 +2,28 @@ import os
 import psycopg2
 import sys
 
-# Default to a placeholder if env var not set (User must set this in Cloud)
-# Example Supabase URL: postgres://postgres:password@db.supabase.co:5432/postgres
-DATABASE_URL = os.environ.get('DATABASE_URL')
+def get_database_url():
+    # 1. Try Environment Variable (GitHub Actions)
+    url = os.environ.get('DATABASE_URL')
+    if url:
+        return url
+    
+    # 2. Try Streamlit Secrets (Streamlit Cloud)
+    try:
+        import streamlit as st
+        # Check Streamlit secrets
+        if "DATABASE_URL" in st.secrets:
+            return st.secrets["DATABASE_URL"]
+    except:
+        pass
+        
+    return None
 
 def get_connection():
-    if not DATABASE_URL:
-        print("[ERROR] DATABASE_URL environment variable is not set.")
-        print("Please set it in your .env file or Cloud Environment Secrets.")
+    url = get_database_url()
+    if not url:
         return None
-    
     try:
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-        return conn
+        return psycopg2.connect(url, sslmode='require')
     except Exception as e:
-        print(f"[ERROR] Connection failed: {e}")
         return None
