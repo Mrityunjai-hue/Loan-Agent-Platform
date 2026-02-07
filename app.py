@@ -6,7 +6,6 @@ import os
 
 # Configuration
 st.set_page_config(page_title="Agentic Loan Platform", layout="wide")
-
 def get_data():
     conn = db_config.get_connection()
     if not conn:
@@ -14,6 +13,7 @@ def get_data():
         
     try:
         # Postgres Syntax: LIMIT instead of TOP
+        # String concatenation: || is standard SQL (Postgres), + is T-SQL (SQL Server)
         # CRITICAL: Postgres returns lowercase columns by default. 
         # We must Alias them with quotes to keep them Capitalized for the DF code.
         query = """
@@ -32,7 +32,6 @@ def get_data():
         JOIN Applicants A ON LA.ApplicantID = A.ApplicantID
         JOIN FinancialProfile FP ON A.ApplicantID = FP.ApplicantID
         LEFT JOIN Predictions P ON LA.ApplicationID = P.ApplicationID
-        ORDER BY LA.ApplicationID DESC
         ORDER BY LA.ApplicationID DESC
         """
         df = pd.read_sql(query, conn)
@@ -256,4 +255,5 @@ elif page == "Check Status":
                 st.error(f"Error: {e}")
         else:
             st.error("Database connection failed.")
+
 
