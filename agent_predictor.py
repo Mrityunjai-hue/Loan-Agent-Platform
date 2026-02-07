@@ -141,6 +141,10 @@ def bootstrap_training(conn, model_path):
         # Write "Ground Truth" to DB so we don't re-process them as pending forever
         # Warning: This "uses up" the pending data to create history
         cursor.execute("UPDATE LoanApplications SET Status = %s WHERE ApplicationID = %s", (result['Status'], app_id))
+        
+        # FIXED: Delete old predictions to prevent duplicates in Dashboard
+        cursor.execute("DELETE FROM Predictions WHERE ApplicationID = %s", (app_id,))
+
         cursor.execute("""
             INSERT INTO Predictions (ApplicationID, PredictedEligibilityScore, RecommendedLoanAmount, ModelRiskLevel, Reasoning)
             VALUES (%s, %s, %s, %s, %s)
@@ -210,6 +214,10 @@ def main():
                         # Fallback Mode
                         result = evaluate_application(row)
                         cursor.execute("UPDATE LoanApplications SET Status = %s WHERE ApplicationID = %s", (result['Status'], row[0]))
+                        
+                        # FIXED: Delete old predictions
+                        cursor.execute("DELETE FROM Predictions WHERE ApplicationID = %s", (row[0],))
+                        
                         cursor.execute("INSERT INTO Predictions (ApplicationID, PredictedEligibilityScore, RecommendedLoanAmount, ModelRiskLevel, Reasoning) VALUES (%s, %s, %s, %s, %s)", 
                             (row[0], result['Score'], result['Amount'], result['Risk'], result['Reason']))
                     else:
@@ -239,6 +247,10 @@ def main():
                         amount = rule_result['Amount'] if status == 'Approved' else 0.0
                         
                         cursor.execute("UPDATE LoanApplications SET Status = %s WHERE ApplicationID = %s", (status, app_id))
+                        
+                        # FIXED: Delete old predictions
+                        cursor.execute("DELETE FROM Predictions WHERE ApplicationID = %s", (app_id,))
+
                         cursor.execute("""
                             INSERT INTO Predictions (ApplicationID, PredictedEligibilityScore, RecommendedLoanAmount, ModelRiskLevel, Reasoning)
                             VALUES (%s, %s, %s, %s, %s)
