@@ -14,7 +14,8 @@ def get_data():
         
     try:
         # Postgres Syntax: LIMIT instead of TOP
-        # String concatenation: || is standard SQL (Postgres), + is T-SQL (SQL Server)
+        # CRITICAL: Postgres returns lowercase columns by default. 
+        # We must Alias them with quotes to keep them Capitalized for the DF code.
         query = """
         SELECT 
             A.ApplicantID AS "ApplicantID",
@@ -43,10 +44,10 @@ def get_data():
 
 # Sidebar Navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to:", ["Live Dashboard", "Apply for Loan"])
+page = st.sidebar.radio("Go to:", ["Live Dashboard", "Apply for Loan", "Check Status"])
 
 if page == "Live Dashboard":
-    st.title("🏦 Agentic Loan Eligibility Platform (Cloud Cloud)")
+    st.title("🏦 Agentic Loan Eligibility Platform (Cloud Version)")
     st.markdown("### AI-Powered Underwriting System (24/7 Simulation)")
 
     # Metrics
@@ -121,7 +122,6 @@ elif page == "Apply for Loan":
                         collateral_type = "None" if collateral_val == 0 else "Other"
                         
                         # INSERT Applicant
-                        # Returning ID syntax for Postgres
                         cursor.execute("""
                             INSERT INTO Applicants (FirstName, LastName, Age, Email, Address, PhoneNumber, MaidenName, SocialMediaHandle, LastLoginIP, LoyaltyPoints, EmploymentStatus, JobTitle, YearsExperience) 
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -152,3 +152,67 @@ elif page == "Apply for Loan":
                 else:
                     st.error("Could not connect to database.")
 
+elif page == "Check Status":
+    st.title("🔍 Check Application Status")
+    
+    app_id_input = st.number_input("Enter Application ID", min_value=1, value=1, step=1)
+    
+    if st.button("Check Status"):
+        conn = db_config.get_connection()
+        if conn:
+            try:
+                # Aliasing for DataFrame compatibility (though we just use fetchone here)
+                query = """
+                SELECT 
+                    LA.ApplicationID,
+                    LA.Status,
+                    LA.RequestAmount,
+                    P.PredictedEligibilityScore,
+                    P.ModelRiskLevel,
+                    P.Reasoning,
+                    P.RecommendedLoanAmount
+                FROM LoanApplications LA
+                LEFT JOIN Predictions P ON LA.ApplicationID = P.ApplicationID
+                WHERE LA.ApplicationID = %s
+                """
+                cursor = conn.cursor()
+                cursor.execute(query, (app_id_input,))
+                row = cursor.fetchone()
+                
+                if row:
+                    # Unpack (Postgres returns tuple)
+                    status = row[1]
+                    req_amount = row[2]
+                    score = row[3] if row[3] is not None else 0.0
+                    risk = row[4] if row[4] is not None else "Unknown"
+                    reasoning = row[5] if row[5] is not None else "Pending AI Analysis..."
+                    rec_amount = row[6]
+                    
+                    st.divider()
+                    st.subheader(f"Application #{row[0]}")
+                    
+                    if status == "Approved":
+                        st.success(f"Status: {status}")
+                    elif status == "Rejected":
+                        st.error(f"Status: {status}")
+                    else:
+                        st.warning(f"Status: {status}")
+                        
+                    col1, col2 = st.columns(2)
+                    col1.metric("Requested Amount", f"₹{req_amount:,.2f}")
+                    if rec_amount:
+                        col2.metric("Approved Amount", f"₹{rec_amount:,.2f}")
+                    
+                    st.markdown("### 🤖 AI Analysis")
+                    st.write(f"**Risk Level:** {risk}")
+                    st.write(f"**Eligibility Score:** {score:.2f}")
+                    st.info(f"**Reasoning:** {reasoning}")
+                    
+                else:
+                    st.error("Application ID not found.")
+                
+                conn.close()
+            except Exception as e:
+                st.error(f"Error: {e}")
+        else:
+            st.error("Database connection failed.")
