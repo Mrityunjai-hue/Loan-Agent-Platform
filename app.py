@@ -33,7 +33,7 @@ def get_data():
         JOIN FinancialProfile FP ON A.ApplicantID = FP.ApplicantID
         LEFT JOIN Predictions P ON LA.ApplicationID = P.ApplicationID
         ORDER BY LA.ApplicationID DESC
-        LIMIT 1000
+        ORDER BY LA.ApplicationID DESC
         """
         df = pd.read_sql(query, conn)
         conn.close()
@@ -256,3 +256,4 @@ elif page == "Check Status":
                 st.error(f"Error: {e}")
         else:
             st.error("Database connection failed.")
+
