@@ -7,7 +7,7 @@ import sys
 # Configuration
 BATCH_SIZE = 10  # Generate 10 at a time
 DELAY_SECONDS = 5 # Wait 5 seconds between batches for demo purposes
-INITIAL_POPULATION = 50000
+INITIAL_POPULATION = 200
 
 # Initialize Faker with Indian Locale
 fake = Faker('en_IN')
@@ -247,3 +247,4 @@ if __name__ == '__main__':
              conn.close()
     else:
         main()
+
