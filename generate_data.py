@@ -232,11 +232,13 @@ def generate_bulk_data(conn):
     print("--- WORLD GENERATION COMPLETE ---")
 
 if __name__ == '__main__':
-    # Cloud Optimization: Limit endless loop or run once for GitHub Actions
+    # Cloud Optimization
     if len(sys.argv) > 1 and sys.argv[1] == '--bulk-only':
          conn = db_config.get_connection()
-         if conn:
-             generate_bulk_data(conn)
-             conn.close()
+         if not conn:
+             raise Exception("CRITICAL ERROR: Could not connect to Database. Check Secrets!")
+             
+         generate_bulk_data(conn)
+         conn.close()
     else:
         main()
