@@ -142,13 +142,13 @@ def bootstrap_training(conn, model_path):
         # Warning: This "uses up" the pending data to create history
         cursor.execute("UPDATE LoanApplications SET Status = %s WHERE ApplicationID = %s", (result['Status'], app_id))
         
-        # FIXED: Delete old predictions to prevent duplicates in Dashboard
-        cursor.execute("DELETE FROM Predictions WHERE ApplicationID = %s", (app_id,))
-
+        # FIXED: Use actual reasoning instead of static string
+        reasoning_text = f"{result['Reason']} (Bootstrapped Label)"
+        
         cursor.execute("""
             INSERT INTO Predictions (ApplicationID, PredictedEligibilityScore, RecommendedLoanAmount, ModelRiskLevel, Reasoning)
             VALUES (%s, %s, %s, %s, %s)
-        """, (app_id, result['Score'], result['Amount'], 'Bootstrap-Truth', 'Initial Training Data'))
+        """, (app_id, result['Score'], result['Amount'], 'Bootstrap-Truth', reasoning_text))
     
     conn.commit()
     print("Step 2: Training Neural Network on Bootstrapped Data...")
@@ -161,7 +161,7 @@ def bootstrap_training(conn, model_path):
     print(f"Model saved to {model_path}")
     
     return model
-
+    
 def main():
     print("Starting AI Prediction Agent (Deep Neural Network Powered)...")
     
@@ -214,10 +214,6 @@ def main():
                         # Fallback Mode
                         result = evaluate_application(row)
                         cursor.execute("UPDATE LoanApplications SET Status = %s WHERE ApplicationID = %s", (result['Status'], row[0]))
-                        
-                        # FIXED: Delete old predictions
-                        cursor.execute("DELETE FROM Predictions WHERE ApplicationID = %s", (row[0],))
-                        
                         cursor.execute("INSERT INTO Predictions (ApplicationID, PredictedEligibilityScore, RecommendedLoanAmount, ModelRiskLevel, Reasoning) VALUES (%s, %s, %s, %s, %s)", 
                             (row[0], result['Score'], result['Amount'], result['Risk'], result['Reason']))
                     else:
@@ -246,15 +242,25 @@ def main():
                         rule_result = evaluate_application(orig_row)
                         amount = rule_result['Amount'] if status == 'Approved' else 0.0
                         
-                        cursor.execute("UPDATE LoanApplications SET Status = %s WHERE ApplicationID = %s", (status, app_id))
+                        # Update: Use status-based logic AND probability for reasoning
+                        # Calculate what the rule reasoning was (e.g. Low CIBIL)
+                        # And display it alongside AI Confidence
                         
-                        # FIXED: Delete old predictions
-                        cursor.execute("DELETE FROM Predictions WHERE ApplicationID = %s", (app_id,))
+                        reason_prefix = "AI Logic"
+                        if status == 'Rejected':
+                            # If rejected, why? Use rule checker to hint at why
+                            fail_reasons = rule_result['Reason']
+                            if "Eligible" in fail_reasons: 
+                                fail_reasons = "Model Rejection (Risk Factors High)" # Model disagreed with simple rules
+                            reasoning_text = f"{fail_reasons} (AI Confidence: {100-int(prob*100)}%)"
+                        else:
+                            reasoning_text = f"Meets Eligibility Criteria (AI Confidence: {int(prob*100)}%)"
 
+                        cursor.execute("UPDATE LoanApplications SET Status = %s WHERE ApplicationID = %s", (status, app_id))
                         cursor.execute("""
                             INSERT INTO Predictions (ApplicationID, PredictedEligibilityScore, RecommendedLoanAmount, ModelRiskLevel, Reasoning)
                             VALUES (%s, %s, %s, %s, %s)
-                        """, (app_id, float(prob), amount, risk, f"DNN Probability: {prob:.4f}"))
+                        """, (app_id, float(prob), amount, risk, reasoning_text))
 
                 conn.commit()
                 print("Batch processed.")
@@ -262,6 +268,7 @@ def main():
                 if single_run:
                     print("No pending applications. Existing.")
                     break
+                print("No pending applications. Existing.")
             
         except Exception as e:
             print(f"Error: {e}")
