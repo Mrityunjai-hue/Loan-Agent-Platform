@@ -109,8 +109,8 @@ def get_data():
         JOIN FinancialProfile FP ON A.ApplicantID = FP.ApplicantID
         LEFT JOIN Predictions P ON LA.ApplicationID = P.ApplicationID
         ORDER BY LA.ApplicationID DESC
-        LIMIT 100
         """
+        # REMOVED LIMIT 100 to show full data
         df = pd.read_sql(query, conn)
         conn.close()
         return df
@@ -169,15 +169,18 @@ if page == "Live Dashboard":
             st.plotly_chart(fig_scatter, use_container_width=True)
 
         # Recent Data Table
-        st.markdown("### 📋 Recent Applications")
+        st.markdown("### 📋 All Applications")
+        # Showing ALL columns and disabling restricted container width to allow scrolling if needed
         st.dataframe(
-            df[['ApplicationID', 'Name', 'RequestAmount', 'Status', 'CreditScore']],
-            use_container_width=True,
+            df,
+            use_container_width=True, # Set to True to fill width, but Streamlit handles overflow with scroll
             hide_index=True,
             column_config={
                 "RequestAmount": st.column_config.NumberColumn("Amount", format="₹%d"),
                 "Status": st.column_config.TextColumn("Status"),
                 "CreditScore": st.column_config.ProgressColumn("Credit Score", min_value=300, max_value=900, format="%d"),
+                "AnnualIncome": st.column_config.NumberColumn("Income", format="₹%d"),
+                "RecommendedLoanAmount": st.column_config.NumberColumn("Approved Amt", format="₹%d"),
             }
         )
         
@@ -376,7 +379,8 @@ elif page == "Check Status":
                                 {'range': [80, 100], 'color': "#e0ffe0"}],
                         }
                     ))
-                    fig.update_layout(height=250, margin=dict(l=20, r=20, t=30, b=20))
+                    # Increased height and margins to prevent clipping
+                    fig.update_layout(height=400, margin=dict(l=30, r=30, t=50, b=50))
                     st.plotly_chart(fig, use_container_width=True)
                     
                     with st.expander("📝 View Detailed Agent Reasoning", expanded=True):
